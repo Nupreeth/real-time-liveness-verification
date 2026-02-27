@@ -173,37 +173,40 @@ Remove-Item Env:ENV_FILE
 4. Verification emails now auto-use request host, so links work across devices.
 5. If a browser hits `https://10.0.11.46:5000` by default, force `http://` explicitly.
 
-## Cloud deploy (recommended: Render)
+## Cloud deploy (recommended no-card path: Hugging Face Spaces)
 
 Vercel is not ideal for this app because it relies on long-running Python CV processing
-with native dependencies (`opencv` + `mediapipe`) and persistent storage.
-Use Render (Docker) for stable hosting.
+with native dependencies (`opencv` + `mediapipe`) and persistent backend state.
+
+Use Hugging Face Spaces (Docker) + Neon PostgreSQL for a no-card deployment path.
 
 ### Deploy steps
 
 1. Push this project to GitHub.
-2. In Render, click **New +** -> **Blueprint**.
-3. Select your GitHub repo (Render will detect `render.yaml`).
-4. Set required environment values in Render dashboard:
-   - `DATABASE_URL` (auto-filled from Render Postgres in blueprint)
-   - `APP_BASE_URL` (use your Render URL, e.g. `https://your-app.onrender.com`)
+2. Create a new Hugging Face Space with SDK = **Docker**.
+3. Upload/push repo code to the Space.
+4. Add required Space secrets:
+   - `DATABASE_URL`
+   - `APP_BASE_URL` (Space URL like `https://<space>.hf.space`)
    - `MAIL_USERNAME`
    - `MAIL_PASSWORD`
    - `MAIL_SENDER`
+   - `SECRET_KEY`
    - `ADMIN_API_KEY`
 5. Deploy.
 6. Test:
-   - `https://your-app.onrender.com/health`
+   - `https://<space>.hf.space/health`
    - register and verify flow from another device.
 
 ### Start command used
 
 ```text
-waitress-serve --host=0.0.0.0 --port=5000 app:app
+waitress-serve --host=0.0.0.0 --port=${PORT:-5000} app:app
 ```
 
-Alternative always-on guide:
-- See [DEPLOY_KOYEB.md](DEPLOY_KOYEB.md)
+Deployment guides:
+- [DEPLOY_HF_SPACES.md](DEPLOY_HF_SPACES.md)
+- [DEPLOY_KOYEB.md](DEPLOY_KOYEB.md)
 
 ## Gmail SMTP notes
 

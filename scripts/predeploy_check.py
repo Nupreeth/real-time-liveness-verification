@@ -1,7 +1,9 @@
 import os
 import sys
+from pathlib import Path
 
 from sqlalchemy import create_engine, text
+from dotenv import load_dotenv
 
 
 REQUIRED_ENV_VARS = [
@@ -25,6 +27,13 @@ def ok(message):
 
 
 def main():
+    project_root = Path(__file__).resolve().parents[1]
+    env_file = os.getenv("ENV_FILE", ".env")
+    env_path = Path(env_file)
+    if not env_path.is_absolute():
+        env_path = project_root / env_path
+    load_dotenv(env_path)
+
     missing = [key for key in REQUIRED_ENV_VARS if not os.getenv(key, "").strip()]
     if missing:
         print("[FAIL] Missing required environment variables:")

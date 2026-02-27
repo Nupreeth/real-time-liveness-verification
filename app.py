@@ -1,6 +1,7 @@
 import os
 import logging
 from datetime import timedelta
+from pathlib import Path
 
 from flask import Flask
 from dotenv import load_dotenv
@@ -25,7 +26,12 @@ def _configure_logging(app):
 
 
 def create_app():
-    load_dotenv()
+    env_file = os.getenv("ENV_FILE", ".env")
+    env_path = Path(env_file)
+    if not env_path.is_absolute():
+        env_path = Path(__file__).resolve().parent / env_path
+    load_dotenv(env_path)
+
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(Config)
     app.permanent_session_lifetime = timedelta(

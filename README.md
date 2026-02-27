@@ -126,17 +126,40 @@ CREATE TABLE verification_events (
    pip install --upgrade pip
    pip install -r requirements.txt
    ```
-3. Create `.env` from `.env.example` and set your values.
-4. Set PostgreSQL connection string:
+3. Create local env from template:
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+4. For hosted deployment, create a separate production file:
+   ```powershell
+   Copy-Item .env.production.example .env.production
+   ```
+   Keep `.env.production` private and never commit it.
+5. Set PostgreSQL connection string:
    ```env
    DATABASE_URL=postgresql+psycopg2://<user>:<password>@<host>:5432/<db_name>
    ```
-5. Run:
+6. Run:
    ```powershell
    python app.py
    ```
-6. Open:
+7. Open:
     - `http://127.0.0.1:5000/register`
+
+## Environment file strategy
+
+- `.env.example`: GitHub-safe local template.
+- `.env.production.example`: GitHub-safe production template.
+- `.env`: local secrets (ignored by git).
+- `.env.production`: deployment secrets (ignored by git).
+
+To run checks against production env locally:
+
+```powershell
+$env:ENV_FILE=".env.production"
+python scripts\predeploy_check.py
+Remove-Item Env:ENV_FILE
+```
 
 ## Use on other devices
 

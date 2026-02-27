@@ -1,8 +1,14 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-load_dotenv()
+DEFAULT_ENV_FILE = ".env"
+env_file = os.getenv("ENV_FILE", DEFAULT_ENV_FILE)
+env_path = Path(env_file)
+if not env_path.is_absolute():
+    env_path = Path(BASE_DIR) / env_path
+load_dotenv(env_path)
 
 
 def _env_bool(name, default=False):

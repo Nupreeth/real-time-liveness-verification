@@ -12,7 +12,13 @@ Copy your connection string, for example:
 
 ## 2. Set environment variables locally (for validation)
 
-Create/update `.env`:
+Create `.env.production` from template:
+
+```powershell
+Copy-Item .env.production.example .env.production
+```
+
+Fill `.env.production`:
 
 ```env
 DATABASE_URL=postgresql+psycopg2://USER:PASSWORD@HOST/DBNAME?sslmode=require
@@ -30,7 +36,9 @@ SESSION_COOKIE_SECURE=true
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
+$env:ENV_FILE=".env.production"
 python scripts\predeploy_check.py
+Remove-Item Env:ENV_FILE
 ```
 
 ## 4. Deploy on Koyeb

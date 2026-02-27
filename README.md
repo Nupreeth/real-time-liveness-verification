@@ -1,3 +1,13 @@
+---
+title: Real-Time Liveness Verification
+emoji: robot
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Eye Blink Verification System
 
 Email-gated liveness verification built with Flask, MediaPipe Face Mesh, and PostgreSQL.

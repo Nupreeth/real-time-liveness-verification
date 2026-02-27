@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Register | Eye Verification{% endblock %}
+{% block content %}
+<section class="panel hero">
+    <div>
+        <p class="eyebrow">Email + Camera Verification</p>
+        <h1>Verify real users with email confirmation and live blink detection.</h1>
+        <p class="subtext">
+            Enter an email, confirm it through a secure link, then complete a short
+            live camera check that captures open-eye and closed-eye frames automatically.
+        </p>
+    </div>
+    <ul class="feature-list">
+        <li>Secure token-based email verification</li>
+        <li>Automatic face and eye-state checks</li>
+        <li>Status tracking in SQLite</li>
+    </ul>
+</section>
+
+<section class="panel form-panel">
+    <h2>Start</h2>
+    <form method="post" action="{{ url_for('auth.register') }}" class="card">
+        <label for="email">Email Address</label>
+        <input id="email" name="email" type="email" placeholder="name@example.com" autocomplete="email" required>
+        <button type="submit">Send Verification Link</button>
+    </form>
+</section>
+{% endblock %}

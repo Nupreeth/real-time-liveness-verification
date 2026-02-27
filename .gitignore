@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.log
+
+.env
+instance/database.db
+instance/*.db-shm
+instance/*.db-wal
+
+static/uploads/open_eye/*
+static/uploads/closed_eye/*
+!static/uploads/open_eye/.gitkeep
+!static/uploads/closed_eye/.gitkeep
+
+.vscode/
+.idea/

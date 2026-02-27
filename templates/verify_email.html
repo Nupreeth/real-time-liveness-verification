@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Verify Link | Eye Verification{% endblock %}
+{% block content %}
+<section class="panel form-panel">
+    <h1>Verify Link</h1>
+
+    {% if token_valid %}
+        <p class="subtext">Your link is valid. Continue to camera verification.</p>
+        <form method="post" action="{{ url_for('auth.verify') }}" class="card">
+            <input type="hidden" name="token" value="{{ token }}">
+            <p class="label-inline">Quick checklist:</p>
+            <ul class="instruction-list">
+                <li>Keep only one face visible in the frame.</li>
+                <li>Use stable lighting and hold the camera steady.</li>
+                <li>Remove spectacles/glasses if detection struggles.</li>
+                <li>Do one natural blink: open -> close -> open.</li>
+            </ul>
+            <button type="submit">Start Camera Check</button>
+        </form>
+    {% else %}
+        <div class="card">
+            <p class="text-error">Invalid or expired verification token.</p>
+            <a class="link-btn" href="{{ url_for('auth.register') }}">Go to Registration</a>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

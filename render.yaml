@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: eye-verification-system
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: SESSION_COOKIE_SAMESITE
+        value: "Lax"
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: DATABASE_PATH
+        value: /var/data/database.db
+      - key: OPEN_EYE_UPLOAD_DIR
+        value: /var/data/uploads/open_eye
+      - key: CLOSED_EYE_UPLOAD_DIR
+        value: /var/data/uploads/closed_eye
+      - key: LIVENESS_TIMEOUT_SECONDS
+        value: "35"
+      - key: FRAME_CAPTURE_INTERVAL_MS
+        value: "200"
+    disk:
+      name: eye-verification-data
+      mountPath: /var/data
+      sizeGB: 1

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Result | Eye Verification{% endblock %}
+{% block content %}
+<section class="panel form-panel">
+    <h1>Verification Result</h1>
+    <div class="card">
+        <p><strong>Email:</strong> {{ email or "Unknown" }}</p>
+        <p>
+            <strong>Status:</strong>
+            {% if status == "VERIFIED" %}
+                <span class="verified">VERIFIED</span>
+            {% elif status == "FAILED" %}
+                <span class="failed">FAILED</span>
+            {% else %}
+                <span class="pending">PENDING</span>
+            {% endif %}
+        </p>
+
+        {% if status == "VERIFIED" %}
+            <p class="subtext">Identity and liveness checks completed successfully.</p>
+            <a class="link-btn" href="{{ url_for('auth.register') }}">Verify Another User</a>
+        {% elif email %}
+            <p class="subtext">Retry with the same registered email.</p>
+            <form method="post" action="{{ url_for('auth.resend_verification') }}">
+                <input type="hidden" name="email" value="{{ email }}">
+                <button type="submit">Resend Verification Link</button>
+            </form>
+        {% else %}
+            <a class="link-btn" href="{{ url_for('auth.register') }}">Go to Registration</a>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

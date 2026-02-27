@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Live Camera Check | Eye Verification{% endblock %}
+{% block body_attrs %}data-email="{{ email }}" data-token="{{ token }}" data-frame-interval="{{ frame_interval_ms }}"{% endblock %}
+{% block content %}
+<section class="panel camera-layout">
+    <div class="camera-card">
+        <video id="webcam" autoplay playsinline muted></video>
+    </div>
+    <aside class="status">
+        <h1>Live Camera Check</h1>
+        <p id="instruction">
+            Keep your face centered, then do one natural blink (open -> close -> open).
+            Remove glasses if eye detection struggles.
+        </p>
+        <p id="status-text">Starting webcam...</p>
+        <p id="ear-text">EAR: --</p>
+
+        <div class="capture-grid">
+            <p id="open-text" class="capture-pill">Open-eye: pending</p>
+            <p id="closed-text" class="capture-pill">Closed-eye: pending</p>
+        </div>
+
+        <div class="progress-block">
+            <div class="progress-meta">
+                <span>Session Progress</span>
+                <span id="progress-label">0%</span>
+            </div>
+            <div class="progress-track">
+                <div id="progress-bar" class="progress-bar"></div>
+            </div>
+        </div>
+    </aside>
+</section>
+<script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+{% endblock %}

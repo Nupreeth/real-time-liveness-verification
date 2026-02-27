@@ -21,6 +21,7 @@ class Config:
         "DATABASE_PATH",
         os.path.join(BASE_DIR, "instance", "database.db"),
     )
+    DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATABASE_PATH}")
     OPEN_EYE_UPLOAD_DIR = os.getenv(
         "OPEN_EYE_UPLOAD_DIR",
         os.path.join(BASE_DIR, "static", "uploads", "open_eye"),

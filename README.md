@@ -1,6 +1,6 @@
 # Eye Blink Verification System
 
-Email-gated liveness verification built with Flask, MediaPipe Face Mesh, and SQLite.
+Email-gated liveness verification built with Flask, MediaPipe Face Mesh, and PostgreSQL.
 
 This system validates two things before marking a user as verified:
 1. The user owns the registered email (tokenized email link verification).
@@ -11,7 +11,7 @@ This system validates two things before marking a user as verified:
 - Clear layered architecture (`routes`, `services`, `models`, `utils`).
 - Real liveness pipeline (face alignment + EAR eye-state classification).
 - Defensive checks (no face, multiple faces, poor alignment, timeout).
-- Persistent workflow state in SQLite (`PENDING`, `VERIFIED`, `FAILED`).
+- Persistent workflow state in PostgreSQL (`PENDING`, `VERIFIED`, `FAILED`).
 - Production-minded defaults (security headers, env-based config, request size limits).
 - Clean UI/UX with guided steps and status feedback.
 
@@ -19,7 +19,8 @@ This system validates two things before marking a user as verified:
 
 - Python 3.11
 - Flask
-- SQLite
+- PostgreSQL
+- SQLAlchemy Core
 - MediaPipe Face Mesh
 - OpenCV
 - NumPy
@@ -72,27 +73,27 @@ eye_verification_system/
 
 ```sql
 CREATE TABLE users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE,
-    verification_token TEXT,
-    status TEXT DEFAULT 'PENDING'
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    verification_token VARCHAR(512),
+    status VARCHAR(20) DEFAULT 'PENDING'
 );
 
 CREATE TABLE verification_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT NOT NULL,
-    status TEXT NOT NULL,
-    reason TEXT DEFAULT '',
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    reason VARCHAR(500) DEFAULT '',
     open_captured INTEGER DEFAULT 0,
     closed_captured INTEGER DEFAULT 0,
-    created_at TEXT NOT NULL
+    created_at VARCHAR(64) NOT NULL
 );
 ```
 
 ## End-to-end flow
 
 1. User submits email at `/register`.
-2. App creates/refreshes user token in SQLite.
+2. App creates/refreshes user token in PostgreSQL.
 3. Verification email is sent with: `/verify?token=...`.
 4. User must click that link to proceed (token-only gate).
 5. User starts liveness check; camera sends frames automatically.
@@ -126,11 +127,15 @@ CREATE TABLE verification_events (
    pip install -r requirements.txt
    ```
 3. Create `.env` from `.env.example` and set your values.
-4. Run:
+4. Set PostgreSQL connection string:
+   ```env
+   DATABASE_URL=postgresql+psycopg2://<user>:<password>@<host>:5432/<db_name>
+   ```
+5. Run:
    ```powershell
    python app.py
    ```
-5. Open:
+6. Open:
     - `http://127.0.0.1:5000/register`
 
 ## Use on other devices
@@ -148,7 +153,7 @@ CREATE TABLE verification_events (
 ## Cloud deploy (recommended: Render)
 
 Vercel is not ideal for this app because it relies on long-running Python CV processing
-with native dependencies (`opencv` + `mediapipe`) and persistent storage for SQLite/uploads.
+with native dependencies (`opencv` + `mediapipe`) and persistent storage.
 Use Render (Docker) for stable hosting.
 
 ### Deploy steps
@@ -157,6 +162,7 @@ Use Render (Docker) for stable hosting.
 2. In Render, click **New +** -> **Blueprint**.
 3. Select your GitHub repo (Render will detect `render.yaml`).
 4. Set required environment values in Render dashboard:
+   - `DATABASE_URL` (auto-filled from Render Postgres in blueprint)
    - `APP_BASE_URL` (use your Render URL, e.g. `https://your-app.onrender.com`)
    - `MAIL_USERNAME`
    - `MAIL_PASSWORD`
@@ -184,6 +190,7 @@ waitress-serve --host=0.0.0.0 --port=5000 app:app
 
 ## Key config options
 
+- `DATABASE_URL` (PostgreSQL DSN used by SQLAlchemy)
 - `FRAME_CAPTURE_INTERVAL_MS` (default `200`)
 - `LIVENESS_TIMEOUT_SECONDS` (default `30`)
 - `MAX_CONTENT_LENGTH` (default `4MB`)
@@ -218,14 +225,14 @@ Health endpoint:
 GET /health
 ```
 
-Query users:
+Query users (PostgreSQL via SQLAlchemy):
 ```powershell
-python -c "import sqlite3; c=sqlite3.connect('instance/database.db'); c.row_factory=sqlite3.Row; [print(dict(r)) for r in c.execute('SELECT id,email,status,verification_token FROM users ORDER BY id DESC')]"
+python -c "from sqlalchemy import create_engine,text; from config import Config; e=create_engine(Config.DATABASE_URL); rows=e.connect().execute(text('SELECT id,email,status,verification_token FROM users ORDER BY id DESC LIMIT 20')); [print(dict(r._mapping)) for r in rows]"
 ```
 
 Recent event logs:
 ```powershell
-python -c "import sqlite3; c=sqlite3.connect('instance/database.db'); c.row_factory=sqlite3.Row; [print(dict(r)) for r in c.execute('SELECT id,email,status,reason,created_at FROM verification_events ORDER BY id DESC LIMIT 20')]"
+python -c "from sqlalchemy import create_engine,text; from config import Config; e=create_engine(Config.DATABASE_URL); rows=e.connect().execute(text('SELECT id,email,status,reason,created_at FROM verification_events ORDER BY id DESC LIMIT 20')); [print(dict(r._mapping)) for r in rows]"
 ```
 
 Admin API (JSON):

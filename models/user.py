@@ -1,99 +1,156 @@
-import sqlite3
 from datetime import datetime, timezone
+
 from flask import current_app
+from sqlalchemy import (
+    Column,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    create_engine,
+    desc,
+    select,
+    text,
+    update,
+)
+from sqlalchemy.engine import Engine
 
 
 VALID_STATUSES = {"PENDING", "VERIFIED", "FAILED"}
 
+_ENGINE_CACHE = {}
+_METADATA = MetaData()
 
-def get_db():
-    connection = sqlite3.connect(current_app.config["DATABASE_PATH"])
-    connection.row_factory = sqlite3.Row
-    return connection
+_USERS_TABLE = Table(
+    "users",
+    _METADATA,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("email", String(255), nullable=False, unique=True),
+    Column("verification_token", String(512)),
+    Column("status", String(20), nullable=False, server_default=text("'PENDING'")),
+)
+
+_VERIFICATION_EVENTS_TABLE = Table(
+    "verification_events",
+    _METADATA,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("email", String(255), nullable=False),
+    Column("status", String(20), nullable=False),
+    Column("reason", String(500), nullable=False, server_default=text("''")),
+    Column("open_captured", Integer, nullable=False, server_default=text("0")),
+    Column("closed_captured", Integer, nullable=False, server_default=text("0")),
+    Column("created_at", String(64), nullable=False),
+)
+
+
+def _normalize_database_url(database_url):
+    if database_url.startswith("postgres://"):
+        return database_url.replace("postgres://", "postgresql://", 1)
+    return database_url
+
+
+def get_engine():
+    database_url = (current_app.config.get("DATABASE_URL") or "").strip()
+    if not database_url:
+        database_path = current_app.config["DATABASE_PATH"]
+        database_url = f"sqlite:///{database_path}"
+
+    database_url = _normalize_database_url(database_url)
+
+    engine = _ENGINE_CACHE.get(database_url)
+    if engine:
+        return engine
+
+    connect_args = {}
+    if database_url.startswith("sqlite"):
+        connect_args["check_same_thread"] = False
+
+    engine = create_engine(
+        database_url,
+        future=True,
+        pool_pre_ping=True,
+        connect_args=connect_args,
+    )
+    _ENGINE_CACHE[database_url] = engine
+    return engine
 
 
 def _row_to_dict(row):
-    return dict(row) if row else None
+    return dict(row._mapping) if row else None
 
 
 def init_db():
-    with get_db() as db:
-        db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE,
-                verification_token TEXT,
-                status TEXT DEFAULT 'PENDING'
-            );
-            """
-        )
-        db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS verification_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT NOT NULL,
-                status TEXT NOT NULL,
-                reason TEXT DEFAULT '',
-                open_captured INTEGER DEFAULT 0,
-                closed_captured INTEGER DEFAULT 0,
-                created_at TEXT NOT NULL
-            );
-            """
-        )
-        db.commit()
+    engine: Engine = get_engine()
+    _METADATA.create_all(engine)
 
 
 def create_or_update_user(email, token):
-    with get_db() as db:
-        existing = db.execute(
-            "SELECT id FROM users WHERE email = ?",
-            (email,),
-        ).fetchone()
+    engine = get_engine()
+    with engine.begin() as connection:
+        existing = connection.execute(
+            select(_USERS_TABLE.c.id).where(_USERS_TABLE.c.email == email)
+        ).first()
+
         if existing:
-            db.execute(
-                "UPDATE users SET verification_token = ?, status = 'PENDING' WHERE email = ?",
-                (token, email),
+            connection.execute(
+                update(_USERS_TABLE)
+                .where(_USERS_TABLE.c.email == email)
+                .values(verification_token=token, status="PENDING")
             )
-            db.commit()
             return "updated"
 
-        db.execute(
-            "INSERT INTO users (email, verification_token, status) VALUES (?, ?, 'PENDING')",
-            (email, token),
+        connection.execute(
+            _USERS_TABLE.insert().values(
+                email=email,
+                verification_token=token,
+                status="PENDING",
+            )
         )
-        db.commit()
         return "created"
 
 
 def get_user_by_email(email):
-    with get_db() as db:
-        row = db.execute(
-            "SELECT id, email, verification_token, status FROM users WHERE email = ?",
-            (email,),
-        ).fetchone()
+    engine = get_engine()
+    with engine.begin() as connection:
+        row = connection.execute(
+            select(
+                _USERS_TABLE.c.id,
+                _USERS_TABLE.c.email,
+                _USERS_TABLE.c.verification_token,
+                _USERS_TABLE.c.status,
+            ).where(_USERS_TABLE.c.email == email)
+        ).first()
     return _row_to_dict(row)
 
 
 def get_user_by_token(token):
-    with get_db() as db:
-        row = db.execute(
-            "SELECT id, email, verification_token, status FROM users WHERE verification_token = ?",
-            (token,),
-        ).fetchone()
+    engine = get_engine()
+    with engine.begin() as connection:
+        row = connection.execute(
+            select(
+                _USERS_TABLE.c.id,
+                _USERS_TABLE.c.email,
+                _USERS_TABLE.c.verification_token,
+                _USERS_TABLE.c.status,
+            ).where(_USERS_TABLE.c.verification_token == token)
+        ).first()
     return _row_to_dict(row)
 
 
 def get_user_by_email_and_token(email, token):
-    with get_db() as db:
-        row = db.execute(
-            """
-            SELECT id, email, verification_token, status
-            FROM users
-            WHERE email = ? AND verification_token = ?
-            """,
-            (email, token),
-        ).fetchone()
+    engine = get_engine()
+    with engine.begin() as connection:
+        row = connection.execute(
+            select(
+                _USERS_TABLE.c.id,
+                _USERS_TABLE.c.email,
+                _USERS_TABLE.c.verification_token,
+                _USERS_TABLE.c.status,
+            ).where(
+                (_USERS_TABLE.c.email == email)
+                & (_USERS_TABLE.c.verification_token == token)
+            )
+        ).first()
     return _row_to_dict(row)
 
 
@@ -102,12 +159,13 @@ def update_user_status(email, status):
     if normalized_status not in VALID_STATUSES:
         raise ValueError(f"Invalid user status: {status}")
 
-    with get_db() as db:
-        db.execute(
-            "UPDATE users SET status = ? WHERE email = ?",
-            (normalized_status, email),
+    engine = get_engine()
+    with engine.begin() as connection:
+        connection.execute(
+            update(_USERS_TABLE)
+            .where(_USERS_TABLE.c.email == email)
+            .values(status=normalized_status)
         )
-        db.commit()
 
 
 def log_verification_event(email, status, reason="", open_captured=False, closed_captured=False):
@@ -116,35 +174,35 @@ def log_verification_event(email, status, reason="", open_captured=False, closed
         raise ValueError(f"Invalid user status for event log: {status}")
 
     created_at = datetime.now(timezone.utc).isoformat()
-    with get_db() as db:
-        db.execute(
-            """
-            INSERT INTO verification_events (
-                email, status, reason, open_captured, closed_captured, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                email,
-                normalized_status,
-                reason,
-                int(bool(open_captured)),
-                int(bool(closed_captured)),
-                created_at,
-            ),
+    engine = get_engine()
+    with engine.begin() as connection:
+        connection.execute(
+            _VERIFICATION_EVENTS_TABLE.insert().values(
+                email=email,
+                status=normalized_status,
+                reason=reason or "",
+                open_captured=int(bool(open_captured)),
+                closed_captured=int(bool(closed_captured)),
+                created_at=created_at,
+            )
         )
-        db.commit()
 
 
 def get_recent_verification_events(limit=100):
     safe_limit = max(1, min(int(limit), 500))
-    with get_db() as db:
-        rows = db.execute(
-            """
-            SELECT id, email, status, reason, open_captured, closed_captured, created_at
-            FROM verification_events
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (safe_limit,),
+    engine = get_engine()
+    with engine.begin() as connection:
+        rows = connection.execute(
+            select(
+                _VERIFICATION_EVENTS_TABLE.c.id,
+                _VERIFICATION_EVENTS_TABLE.c.email,
+                _VERIFICATION_EVENTS_TABLE.c.status,
+                _VERIFICATION_EVENTS_TABLE.c.reason,
+                _VERIFICATION_EVENTS_TABLE.c.open_captured,
+                _VERIFICATION_EVENTS_TABLE.c.closed_captured,
+                _VERIFICATION_EVENTS_TABLE.c.created_at,
+            )
+            .order_by(desc(_VERIFICATION_EVENTS_TABLE.c.id))
+            .limit(safe_limit)
         ).fetchall()
-    return [dict(row) for row in rows]
+    return [dict(row._mapping) for row in rows]

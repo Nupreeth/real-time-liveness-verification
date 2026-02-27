@@ -179,6 +179,9 @@ Use Render (Docker) for stable hosting.
 waitress-serve --host=0.0.0.0 --port=5000 app:app
 ```
 
+Alternative always-on guide:
+- See [DEPLOY_KOYEB.md](DEPLOY_KOYEB.md)
+
 ## Gmail SMTP notes
 
 - Use Gmail App Password (16-char), not your normal account password.

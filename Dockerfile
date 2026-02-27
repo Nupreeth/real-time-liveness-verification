@@ -16,6 +16,6 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY . .
 
-EXPOSE 5000
+EXPOSE 7860
 
-CMD ["sh", "-c", "waitress-serve --host=0.0.0.0 --port=${PORT:-5000} app:app"]
+CMD ["sh", "-c", "waitress-serve --host=0.0.0.0 --port=${PORT:-7860} app:app"]

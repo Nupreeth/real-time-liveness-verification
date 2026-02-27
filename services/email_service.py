@@ -1,5 +1,8 @@
 import smtplib
 import socket
+import json
+import urllib.error
+import urllib.request
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -42,6 +45,40 @@ def send_verification_email(recipient_email, token, base_url_override=None):
     """
     message.attach(MIMEText(text_body, "plain"))
     message.attach(MIMEText(html_body, "html"))
+
+    resend_api_key = current_app.config.get("RESEND_API_KEY", "")
+    if resend_api_key:
+        from_email = current_app.config["MAIL_SENDER"] or current_app.config["MAIL_USERNAME"]
+        payload = {
+            "from": from_email,
+            "to": [recipient_email],
+            "subject": "Eye Verification - Email Confirmation",
+            "text": text_body,
+            "html": html_body,
+        }
+        request_data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=request_data,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {resend_api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as response:
+                if response.status in (200, 201):
+                    return True, verification_url, ""
+                current_app.logger.warning("Resend returned non-success status: %s", response.status)
+                return False, verification_url, f"Resend HTTP status {response.status}"
+        except urllib.error.HTTPError as exc:
+            details = exc.read().decode("utf-8", errors="ignore")
+            current_app.logger.warning("Resend API rejected email: %s %s", exc.code, details)
+            return False, verification_url, f"Resend HTTPError {exc.code}: {details}"
+        except urllib.error.URLError as exc:
+            current_app.logger.warning("Resend network error: %s", exc)
+            return False, verification_url, f"Resend URLError: {exc}"
 
     host = current_app.config["MAIL_SERVER"]
     sender = current_app.config["MAIL_SENDER"]

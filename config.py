@@ -47,6 +47,7 @@ class Config:
     MAIL_USERNAME = os.getenv("MAIL_USERNAME", "")
     MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
     MAIL_SENDER = os.getenv("MAIL_SENDER", MAIL_USERNAME or "no-reply@example.com")
+    RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
     ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
 
     FRAME_CAPTURE_INTERVAL_MS = int(os.getenv("FRAME_CAPTURE_INTERVAL_MS", "200"))

@@ -1,6 +1,6 @@
 ---
 title: Real-Time Liveness Verification
-emoji: robot
+emoji: 🤖
 colorFrom: blue
 colorTo: green
 sdk: docker

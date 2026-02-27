@@ -42,6 +42,8 @@ class Config:
     MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
     MAIL_PORT = int(os.getenv("MAIL_PORT", "587"))
     MAIL_USE_TLS = _env_bool("MAIL_USE_TLS", default=True)
+    MAIL_USE_SSL_FALLBACK = _env_bool("MAIL_USE_SSL_FALLBACK", default=True)
+    MAIL_TIMEOUT_SECONDS = int(os.getenv("MAIL_TIMEOUT_SECONDS", "8"))
     MAIL_USERNAME = os.getenv("MAIL_USERNAME", "")
     MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
     MAIL_SENDER = os.getenv("MAIL_SENDER", MAIL_USERNAME or "no-reply@example.com")

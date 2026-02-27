@@ -1,4 +1,5 @@
 import smtplib
+import socket
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -42,24 +43,39 @@ def send_verification_email(recipient_email, token, base_url_override=None):
     message.attach(MIMEText(text_body, "plain"))
     message.attach(MIMEText(html_body, "html"))
 
-    try:
-        with smtplib.SMTP(
-            current_app.config["MAIL_SERVER"],
-            current_app.config["MAIL_PORT"],
-            timeout=20,
-        ) as smtp:
-            if current_app.config["MAIL_USE_TLS"]:
-                smtp.starttls()
-            smtp.login(username, password)
-            smtp.sendmail(
-                current_app.config["MAIL_SENDER"],
-                [recipient_email],
-                message.as_string(),
+    host = current_app.config["MAIL_SERVER"]
+    sender = current_app.config["MAIL_SENDER"]
+    primary_port = current_app.config["MAIL_PORT"]
+    use_tls = current_app.config["MAIL_USE_TLS"]
+    timeout_seconds = current_app.config["MAIL_TIMEOUT_SECONDS"]
+    use_ssl_fallback = current_app.config["MAIL_USE_SSL_FALLBACK"]
+
+    attempts = [(primary_port, use_tls, "primary")]
+    if use_ssl_fallback and not (primary_port == 465 and not use_tls):
+        attempts.append((465, False, "fallback_ssl_465"))
+
+    errors = []
+    for port, tls_enabled, label in attempts:
+        try:
+            if tls_enabled:
+                with smtplib.SMTP(host, port, timeout=timeout_seconds) as smtp:
+                    smtp.starttls()
+                    smtp.login(username, password)
+                    smtp.sendmail(sender, [recipient_email], message.as_string())
+            else:
+                with smtplib.SMTP_SSL(host, port, timeout=timeout_seconds) as smtp:
+                    smtp.login(username, password)
+                    smtp.sendmail(sender, [recipient_email], message.as_string())
+            return True, verification_url, ""
+        except (smtplib.SMTPException, socket.timeout, OSError) as exc:
+            errors.append(f"{label}:{type(exc).__name__}:{exc}")
+            current_app.logger.warning(
+                "Email send attempt failed (%s on %s:%s): %s",
+                label,
+                host,
+                port,
+                exc,
             )
-        return True, verification_url, ""
-    except smtplib.SMTPException as exc:
-        current_app.logger.exception("SMTP failure while sending verification email.")
-        return False, verification_url, str(exc)
-    except Exception as exc:
-        current_app.logger.exception("Unexpected failure while sending verification email.")
-        return False, verification_url, str(exc)
+
+    current_app.logger.error("All email send attempts failed.")
+    return False, verification_url, " | ".join(errors)

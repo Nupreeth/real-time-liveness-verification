@@ -49,6 +49,7 @@ class Config:
     MAIL_SENDER = os.getenv("MAIL_SENDER", MAIL_USERNAME or "no-reply@example.com")
     RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
     RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev").strip()
+    RESEND_USER_AGENT = os.getenv("RESEND_USER_AGENT", "eye-verification-system/1.0").strip()
     ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
 
     FRAME_CAPTURE_INTERVAL_MS = int(os.getenv("FRAME_CAPTURE_INTERVAL_MS", "200"))

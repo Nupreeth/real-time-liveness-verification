@@ -69,6 +69,10 @@ def send_verification_email(recipient_email, token, base_url_override=None):
             headers={
                 "Authorization": f"Bearer {resend_api_key}",
                 "Content-Type": "application/json",
+                "User-Agent": current_app.config.get(
+                    "RESEND_USER_AGENT",
+                    "eye-verification-system/1.0",
+                ),
             },
         )
         try:

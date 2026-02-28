@@ -19,13 +19,14 @@ def send_verification_email(recipient_email, token, base_url_override=None):
 
     username = current_app.config["MAIL_USERNAME"]
     password = current_app.config["MAIL_PASSWORD"]
+    resend_api_key = current_app.config.get("RESEND_API_KEY", "")
 
-    if not username or not password:
+    if not resend_api_key and (not username or not password):
         current_app.logger.warning(
-            "MAIL credentials missing. Use this verification link locally: %s",
+            "No email provider credentials configured. Use this verification link locally: %s",
             verification_url,
         )
-        return False, verification_url, "MAIL credentials are not configured."
+        return False, verification_url, "No email provider credentials are configured."
 
     message = MIMEMultipart("alternative")
     message["Subject"] = "Eye Verification - Email Confirmation"
@@ -46,7 +47,6 @@ def send_verification_email(recipient_email, token, base_url_override=None):
     message.attach(MIMEText(text_body, "plain"))
     message.attach(MIMEText(html_body, "html"))
 
-    resend_api_key = current_app.config.get("RESEND_API_KEY", "")
     resend_error = ""
     if resend_api_key:
         from_email = (
@@ -96,9 +96,18 @@ def send_verification_email(recipient_email, token, base_url_override=None):
     timeout_seconds = current_app.config["MAIL_TIMEOUT_SECONDS"]
     use_ssl_fallback = current_app.config["MAIL_USE_SSL_FALLBACK"]
 
-    attempts = [(primary_port, use_tls, "primary")]
-    if use_ssl_fallback and not (primary_port == 465 and not use_tls):
-        attempts.append((465, False, "fallback_ssl_465"))
+    attempts = []
+    if username and password:
+        attempts.append((primary_port, use_tls, "primary"))
+        if use_ssl_fallback and not (primary_port == 465 and not use_tls):
+            attempts.append((465, False, "fallback_ssl_465"))
+    else:
+        errors = []
+        if resend_error:
+            errors.append(resend_error)
+        errors.append("SMTP credentials are not configured.")
+        current_app.logger.error("All email send attempts failed.")
+        return False, verification_url, " | ".join(errors)
 
     errors = []
     if resend_error:

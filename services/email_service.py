@@ -49,7 +49,11 @@ def send_verification_email(recipient_email, token, base_url_override=None):
     resend_api_key = current_app.config.get("RESEND_API_KEY", "")
     resend_error = ""
     if resend_api_key:
-        from_email = current_app.config["MAIL_SENDER"] or current_app.config["MAIL_USERNAME"]
+        from_email = (
+            current_app.config.get("RESEND_FROM_EMAIL")
+            or current_app.config["MAIL_SENDER"]
+            or current_app.config["MAIL_USERNAME"]
+        )
         payload = {
             "from": from_email,
             "to": [recipient_email],

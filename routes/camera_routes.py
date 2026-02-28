@@ -88,6 +88,8 @@ def process_frame():
             reason="internal_processing_error",
             open_captured=False,
             closed_captured=False,
+            open_capture_ref="",
+            closed_capture_ref="",
         )
         session["result_email"] = email
         session.pop("verified_email", None)
@@ -102,6 +104,8 @@ def process_frame():
             reason=result.get("message", ""),
             open_captured=result.get("open_captured", False),
             closed_captured=result.get("closed_captured", False),
+            open_capture_ref=result.get("open_capture_ref", ""),
+            closed_capture_ref=result.get("closed_capture_ref", ""),
         )
         session["result_email"] = email
         session.pop("verified_email", None)
@@ -114,6 +118,8 @@ def process_frame():
             reason=result.get("message", ""),
             open_captured=result.get("open_captured", False),
             closed_captured=result.get("closed_captured", False),
+            open_capture_ref=result.get("open_capture_ref", ""),
+            closed_capture_ref=result.get("closed_capture_ref", ""),
         )
         session["result_email"] = email
         session.pop("verified_email", None)
@@ -189,6 +195,8 @@ def admin_events_csv():
             "reason",
             "open_captured",
             "closed_captured",
+            "open_capture_ref",
+            "closed_capture_ref",
             "created_at",
         ],
     )

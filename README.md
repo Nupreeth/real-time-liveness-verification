@@ -34,6 +34,7 @@ This system validates two things before marking a user as verified:
 - MediaPipe Face Mesh
 - OpenCV
 - NumPy
+- Cloudinary (optional persistent capture storage)
 - Vanilla JavaScript (Webcam API)
 - HTML/CSS (Jinja templates)
 - SMTP (Gmail App Password)
@@ -96,6 +97,8 @@ CREATE TABLE verification_events (
     reason VARCHAR(500) DEFAULT '',
     open_captured INTEGER DEFAULT 0,
     closed_captured INTEGER DEFAULT 0,
+    open_capture_ref VARCHAR(1024) DEFAULT '',
+    closed_capture_ref VARCHAR(1024) DEFAULT '',
     created_at VARCHAR(64) NOT NULL
 );
 ```
@@ -112,7 +115,7 @@ CREATE TABLE verification_events (
    - face alignment and distance
    - frame sharpness
    - eye state (`OPEN`/`CLOSED`) using EAR
-7. Best open-eye and closed-eye frames are saved.
+7. Best open-eye and closed-eye frames are saved and can be pushed to persistent storage.
 8. Status is updated:
    - `VERIFIED` when both captures succeed
    - `FAILED` on timeout or session failure
@@ -201,6 +204,11 @@ Use Hugging Face Spaces (Docker) + Neon PostgreSQL for a no-card deployment path
    - `MAIL_USERNAME`
    - `MAIL_PASSWORD`
    - `MAIL_SENDER`
+   - `RESEND_API_KEY` (recommended for hosted delivery reliability)
+   - `RESEND_FROM_EMAIL` (default `onboarding@resend.dev` for testing)
+   - `CLOUDINARY_CLOUD_NAME` (optional for persistent image storage)
+   - `CLOUDINARY_API_KEY` (optional)
+   - `CLOUDINARY_API_SECRET` (optional)
    - `SECRET_KEY`
    - `ADMIN_API_KEY`
 5. Deploy.
@@ -211,7 +219,7 @@ Use Hugging Face Spaces (Docker) + Neon PostgreSQL for a no-card deployment path
 ### Start command used
 
 ```text
-waitress-serve --host=0.0.0.0 --port=${PORT:-5000} app:app
+waitress-serve --host=0.0.0.0 --port=${PORT:-7860} app:app
 ```
 
 Deployment guides:
@@ -271,7 +279,7 @@ python -c "from sqlalchemy import create_engine,text; from config import Config;
 
 Recent event logs:
 ```powershell
-python -c "from sqlalchemy import create_engine,text; from config import Config; e=create_engine(Config.DATABASE_URL); rows=e.connect().execute(text('SELECT id,email,status,reason,created_at FROM verification_events ORDER BY id DESC LIMIT 20')); [print(dict(r._mapping)) for r in rows]"
+python -c "from sqlalchemy import create_engine,text; from config import Config; e=create_engine(Config.DATABASE_URL); rows=e.connect().execute(text('SELECT id,email,status,reason,open_capture_ref,closed_capture_ref,created_at FROM verification_events ORDER BY id DESC LIMIT 20')); [print(dict(r._mapping)) for r in rows]"
 ```
 
 Admin API (JSON):

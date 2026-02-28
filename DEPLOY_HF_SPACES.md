@@ -36,11 +36,17 @@ Open **Settings -> Repository secrets** and add:
 - `MAIL_USERNAME`
 - `MAIL_PASSWORD`
 - `MAIL_SENDER`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL` (`onboarding@resend.dev` for testing)
 - `SECRET_KEY`
 - `ADMIN_API_KEY`
 - `FLASK_DEBUG` = `0`
 - `SESSION_COOKIE_SECURE` = `true`
 - `LOG_LEVEL` = `INFO`
+- `CLOUDINARY_CLOUD_NAME` (optional)
+- `CLOUDINARY_API_KEY` (optional)
+- `CLOUDINARY_API_SECRET` (optional)
+- `CLOUDINARY_FOLDER` (optional, default `eye-verification`)
 
 Set `APP_BASE_URL` to your Space URL:
 

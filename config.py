@@ -50,6 +50,10 @@ class Config:
     RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
     RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev").strip()
     RESEND_USER_AGENT = os.getenv("RESEND_USER_AGENT", "eye-verification-system/1.0").strip()
+    CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "").strip()
+    CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "").strip()
+    CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "").strip()
+    CLOUDINARY_FOLDER = os.getenv("CLOUDINARY_FOLDER", "eye-verification").strip()
     ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
 
     FRAME_CAPTURE_INTERVAL_MS = int(os.getenv("FRAME_CAPTURE_INTERVAL_MS", "200"))

@@ -8,6 +8,7 @@ from flask import current_app
 
 from services.eye_detection import EyeDetector
 from services.face_detection import evaluate_face_alignment, extract_face_box
+from services.storage_service import upload_capture
 from utils.constants import LIVENESS_TIMEOUT_SECONDS, MIN_FRAME_SHARPNESS
 from utils.image_utils import compute_sharpness, decode_base64_image, sanitize_filename
 
@@ -17,6 +18,7 @@ class EyeFrameCapture:
     captured: bool = False
     score: float = -1.0
     file_path: str = ""
+    storage_ref: str = ""
 
 
 class LivenessSession:
@@ -90,6 +92,44 @@ class LivenessManager:
         cv2.imwrite(file_path, frame)
         return file_path
 
+    @staticmethod
+    def _persist_capture_ref(file_path, email, token, eye_state):
+        if not file_path:
+            return ""
+
+        folder_base = current_app.config.get("CLOUDINARY_FOLDER", "eye-verification")
+        folder = f"{folder_base}/{eye_state.lower()}"
+        public_id = (
+            f"{sanitize_filename(email)}_"
+            f"{sanitize_filename(token)[:20]}_"
+            f"{eye_state.lower()}_{int(time.time() * 1000)}"
+        )
+        cloud_url = upload_capture(file_path=file_path, folder=folder, public_id=public_id)
+        if cloud_url:
+            return cloud_url
+        return file_path.replace("\\", "/")
+
+    def _finalize_capture_refs(self, session, email, token):
+        if session.open_eye.captured and not session.open_eye.storage_ref:
+            session.open_eye.storage_ref = self._persist_capture_ref(
+                session.open_eye.file_path,
+                email,
+                token,
+                "open",
+            )
+        if session.closed_eye.captured and not session.closed_eye.storage_ref:
+            session.closed_eye.storage_ref = self._persist_capture_ref(
+                session.closed_eye.file_path,
+                email,
+                token,
+                "closed",
+            )
+
+        return {
+            "open_capture_ref": session.open_eye.storage_ref or "",
+            "closed_capture_ref": session.closed_eye.storage_ref or "",
+        }
+
     def _update_capture(self, session, eye_state, score, frame, email):
         if eye_state not in {"OPEN", "CLOSED"}:
             return
@@ -151,6 +191,7 @@ class LivenessManager:
                     "state": "failed",
                     "message": "Liveness check timed out.",
                     **self._base_status(session),
+                    **self._finalize_capture_refs(session, email, token),
                 }
 
             frame = decode_base64_image(image_data)
@@ -235,6 +276,7 @@ class LivenessManager:
                     "message": "Blink verified successfully with open and closed eye captures.",
                     **self._base_status(session),
                     "ear": eye_result["ear"],
+                    **self._finalize_capture_refs(session, email, token),
                 }
 
             if eye_result["eye_state"] == "UNSURE":

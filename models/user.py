@@ -9,6 +9,7 @@ from sqlalchemy import (
     Table,
     create_engine,
     desc,
+    inspect,
     select,
     text,
     update,
@@ -39,6 +40,8 @@ _VERIFICATION_EVENTS_TABLE = Table(
     Column("reason", String(500), nullable=False, server_default=text("''")),
     Column("open_captured", Integer, nullable=False, server_default=text("0")),
     Column("closed_captured", Integer, nullable=False, server_default=text("0")),
+    Column("open_capture_ref", String(1024), nullable=False, server_default=text("''")),
+    Column("closed_capture_ref", String(1024), nullable=False, server_default=text("''")),
     Column("created_at", String(64), nullable=False),
 )
 
@@ -82,6 +85,27 @@ def _row_to_dict(row):
 def init_db():
     engine: Engine = get_engine()
     _METADATA.create_all(engine)
+    _ensure_verification_events_columns(engine)
+
+
+def _ensure_verification_events_columns(engine: Engine):
+    inspector = inspect(engine)
+    if not inspector.has_table("verification_events"):
+        return
+
+    existing = {col["name"] for col in inspector.get_columns("verification_events")}
+    required = {
+        "open_capture_ref": "VARCHAR(1024) NOT NULL DEFAULT ''",
+        "closed_capture_ref": "VARCHAR(1024) NOT NULL DEFAULT ''",
+    }
+
+    with engine.begin() as connection:
+        for column_name, definition in required.items():
+            if column_name in existing:
+                continue
+            connection.execute(
+                text(f"ALTER TABLE verification_events ADD COLUMN {column_name} {definition}")
+            )
 
 
 def create_or_update_user(email, token):
@@ -168,7 +192,15 @@ def update_user_status(email, status):
         )
 
 
-def log_verification_event(email, status, reason="", open_captured=False, closed_captured=False):
+def log_verification_event(
+    email,
+    status,
+    reason="",
+    open_captured=False,
+    closed_captured=False,
+    open_capture_ref="",
+    closed_capture_ref="",
+):
     normalized_status = status.upper()
     if normalized_status not in VALID_STATUSES:
         raise ValueError(f"Invalid user status for event log: {status}")
@@ -183,6 +215,8 @@ def log_verification_event(email, status, reason="", open_captured=False, closed
                 reason=reason or "",
                 open_captured=int(bool(open_captured)),
                 closed_captured=int(bool(closed_captured)),
+                open_capture_ref=open_capture_ref or "",
+                closed_capture_ref=closed_capture_ref or "",
                 created_at=created_at,
             )
         )
@@ -200,6 +234,8 @@ def get_recent_verification_events(limit=100):
                 _VERIFICATION_EVENTS_TABLE.c.reason,
                 _VERIFICATION_EVENTS_TABLE.c.open_captured,
                 _VERIFICATION_EVENTS_TABLE.c.closed_captured,
+                _VERIFICATION_EVENTS_TABLE.c.open_capture_ref,
+                _VERIFICATION_EVENTS_TABLE.c.closed_capture_ref,
                 _VERIFICATION_EVENTS_TABLE.c.created_at,
             )
             .order_by(desc(_VERIFICATION_EVENTS_TABLE.c.id))

@@ -47,6 +47,7 @@ def send_verification_email(recipient_email, token, base_url_override=None):
     message.attach(MIMEText(html_body, "html"))
 
     resend_api_key = current_app.config.get("RESEND_API_KEY", "")
+    resend_error = ""
     if resend_api_key:
         from_email = current_app.config["MAIL_SENDER"] or current_app.config["MAIL_USERNAME"]
         payload = {
@@ -71,14 +72,18 @@ def send_verification_email(recipient_email, token, base_url_override=None):
                 if response.status in (200, 201):
                     return True, verification_url, ""
                 current_app.logger.warning("Resend returned non-success status: %s", response.status)
-                return False, verification_url, f"Resend HTTP status {response.status}"
+                resend_error = f"Resend HTTP status {response.status}"
         except urllib.error.HTTPError as exc:
             details = exc.read().decode("utf-8", errors="ignore")
             current_app.logger.warning("Resend API rejected email: %s %s", exc.code, details)
-            return False, verification_url, f"Resend HTTPError {exc.code}: {details}"
+            resend_error = f"Resend HTTPError {exc.code}: {details}"
         except urllib.error.URLError as exc:
             current_app.logger.warning("Resend network error: %s", exc)
-            return False, verification_url, f"Resend URLError: {exc}"
+            resend_error = f"Resend URLError: {exc}"
+
+        # If Resend is configured but fails, continue to SMTP fallback.
+        if resend_error:
+            current_app.logger.warning("Resend attempt failed, falling back to SMTP: %s", resend_error)
 
     host = current_app.config["MAIL_SERVER"]
     sender = current_app.config["MAIL_SENDER"]
@@ -92,6 +97,8 @@ def send_verification_email(recipient_email, token, base_url_override=None):
         attempts.append((465, False, "fallback_ssl_465"))
 
     errors = []
+    if resend_error:
+        errors.append(resend_error)
     for port, tls_enabled, label in attempts:
         try:
             if tls_enabled:

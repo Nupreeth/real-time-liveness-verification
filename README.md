@@ -37,7 +37,7 @@ This system validates two things before marking a user as verified:
 - Cloudinary (optional persistent capture storage)
 - Vanilla JavaScript (Webcam API)
 - HTML/CSS (Jinja templates)
-- SMTP (Gmail App Password)
+- Gmail API or SMTP for email delivery
 
 ## Project structure
 
@@ -201,11 +201,13 @@ Use Hugging Face Spaces (Docker) + Neon PostgreSQL for a no-card deployment path
 4. Add required Space secrets:
    - `DATABASE_URL`
    - `APP_BASE_URL` (Space URL like `https://<space>.hf.space`)
-   - `MAIL_USERNAME`
-   - `MAIL_PASSWORD`
    - `MAIL_SENDER`
-   - `RESEND_API_KEY` (recommended for hosted delivery reliability)
-   - `RESEND_FROM_EMAIL` (default `onboarding@resend.dev` for testing)
+   - `GMAIL_API_CLIENT_ID` (recommended for hosted delivery)
+   - `GMAIL_API_CLIENT_SECRET`
+   - `GMAIL_API_REFRESH_TOKEN`
+   - `GMAIL_API_SENDER`
+   - `RESEND_API_KEY` (optional fallback only)
+   - `RESEND_FROM_EMAIL` (test-only sender on `resend.dev`)
    - `CLOUDINARY_CLOUD_NAME` (optional for persistent image storage)
    - `CLOUDINARY_API_KEY` (optional)
    - `CLOUDINARY_API_SECRET` (optional)
@@ -226,14 +228,20 @@ Deployment guides:
 - [DEPLOY_HF_SPACES.md](DEPLOY_HF_SPACES.md)
 - [DEPLOY_KOYEB.md](DEPLOY_KOYEB.md)
 
-## Gmail SMTP notes
+## Gmail hosted email notes
 
-- Use Gmail App Password (16-char), not your normal account password.
-- Required keys in `.env`:
+- For hosted platforms like Hugging Face, Gmail API over HTTPS is more reliable than SMTP.
+- Required keys for Gmail API:
+  - `GMAIL_API_CLIENT_ID`
+  - `GMAIL_API_CLIENT_SECRET`
+  - `GMAIL_API_REFRESH_TOKEN`
+  - `GMAIL_API_SENDER`
+- Generate a refresh token locally:
+  - `python scripts\gmail_oauth_setup.py --env-file .env.production`
+- SMTP with App Password is still supported for local runs:
   - `MAIL_USERNAME`
   - `MAIL_PASSWORD`
   - `MAIL_SENDER`
-  - `APP_BASE_URL`
 
 ## Key config options
 

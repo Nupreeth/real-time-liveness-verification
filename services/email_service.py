@@ -1,7 +1,10 @@
 import smtplib
 import socket
 import json
+import time
+import base64
 import urllib.error
+import urllib.parse
 import urllib.request
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -14,23 +17,13 @@ def build_verification_url(token, base_url_override=None):
     return f"{base_url}/verify?token={token}"
 
 
-def send_verification_email(recipient_email, token, base_url_override=None):
-    verification_url = build_verification_url(token, base_url_override=base_url_override)
+_gmail_access_token_cache = {"token": "", "expires_at": 0}
 
-    username = current_app.config["MAIL_USERNAME"]
-    password = current_app.config["MAIL_PASSWORD"]
-    resend_api_key = current_app.config.get("RESEND_API_KEY", "")
 
-    if not resend_api_key and (not username or not password):
-        current_app.logger.warning(
-            "No email provider credentials configured. Use this verification link locally: %s",
-            verification_url,
-        )
-        return False, verification_url, "No email provider credentials are configured."
-
+def _build_message(sender, recipient_email, verification_url):
     message = MIMEMultipart("alternative")
     message["Subject"] = "Eye Verification - Email Confirmation"
-    message["From"] = current_app.config["MAIL_SENDER"]
+    message["From"] = sender
     message["To"] = recipient_email
 
     text_body = (
@@ -46,13 +39,108 @@ def send_verification_email(recipient_email, token, base_url_override=None):
     """
     message.attach(MIMEText(text_body, "plain"))
     message.attach(MIMEText(html_body, "html"))
+    return message, text_body, html_body
+
+
+def _is_gmail_api_configured():
+    return all(
+        [
+            current_app.config.get("GMAIL_API_CLIENT_ID"),
+            current_app.config.get("GMAIL_API_CLIENT_SECRET"),
+            current_app.config.get("GMAIL_API_REFRESH_TOKEN"),
+        ]
+    )
+
+
+def _fetch_gmail_access_token():
+    now = int(time.time())
+    cached_token = _gmail_access_token_cache.get("token", "")
+    expires_at = int(_gmail_access_token_cache.get("expires_at", 0))
+    if cached_token and now < expires_at - 30:
+        return cached_token
+
+    data = urllib.parse.urlencode(
+        {
+            "client_id": current_app.config["GMAIL_API_CLIENT_ID"],
+            "client_secret": current_app.config["GMAIL_API_CLIENT_SECRET"],
+            "refresh_token": current_app.config["GMAIL_API_REFRESH_TOKEN"],
+            "grant_type": "refresh_token",
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        "https://oauth2.googleapis.com/token",
+        data=data,
+        method="POST",
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    with urllib.request.urlopen(req, timeout=15) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+
+    access_token = payload.get("access_token", "")
+    expires_in = int(payload.get("expires_in", 3600))
+    if not access_token:
+        raise RuntimeError("Gmail API access token not returned.")
+
+    _gmail_access_token_cache["token"] = access_token
+    _gmail_access_token_cache["expires_at"] = now + expires_in
+    return access_token
+
+
+def _send_via_gmail_api(message):
+    access_token = _fetch_gmail_access_token()
+    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+    payload = json.dumps({"raw": raw_message}).encode("utf-8")
+    req = urllib.request.Request(
+        "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        data=payload,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=15) as response:
+        return response.status in (200, 202)
+
+
+def send_verification_email(recipient_email, token, base_url_override=None):
+    verification_url = build_verification_url(token, base_url_override=base_url_override)
+
+    username = current_app.config["MAIL_USERNAME"]
+    password = current_app.config["MAIL_PASSWORD"]
+    resend_api_key = current_app.config.get("RESEND_API_KEY", "")
+    sender = (
+        current_app.config.get("GMAIL_API_SENDER")
+        or username
+        or current_app.config["MAIL_SENDER"]
+        or "no-reply@example.com"
+    )
+    message, text_body, html_body = _build_message(sender, recipient_email, verification_url)
+
+    provider_configured = _is_gmail_api_configured() or resend_api_key or (username and password)
+    if not provider_configured:
+        current_app.logger.warning(
+            "No email provider credentials configured. Use this verification link locally: %s",
+            verification_url,
+        )
+        return False, verification_url, "No email provider credentials are configured."
+
+    errors = []
+    if _is_gmail_api_configured():
+        try:
+            sent = _send_via_gmail_api(message)
+            if sent:
+                return True, verification_url, ""
+            errors.append("Gmail API returned non-success status.")
+        except (urllib.error.HTTPError, urllib.error.URLError, RuntimeError, ValueError) as exc:
+            errors.append(f"GmailAPI:{type(exc).__name__}:{exc}")
+            current_app.logger.warning("Gmail API send failed: %s", exc)
 
     resend_error = ""
     if resend_api_key:
         from_email = (
             current_app.config.get("RESEND_FROM_EMAIL")
-            or current_app.config["MAIL_SENDER"]
-            or current_app.config["MAIL_USERNAME"]
+            or sender
         )
         payload = {
             "from": from_email,
@@ -92,9 +180,9 @@ def send_verification_email(recipient_email, token, base_url_override=None):
         # If Resend is configured but fails, continue to SMTP fallback.
         if resend_error:
             current_app.logger.warning("Resend attempt failed, falling back to SMTP: %s", resend_error)
+            errors.append(resend_error)
 
     host = current_app.config["MAIL_SERVER"]
-    sender = current_app.config["MAIL_SENDER"]
     primary_port = current_app.config["MAIL_PORT"]
     use_tls = current_app.config["MAIL_USE_TLS"]
     timeout_seconds = current_app.config["MAIL_TIMEOUT_SECONDS"]
@@ -105,17 +193,11 @@ def send_verification_email(recipient_email, token, base_url_override=None):
         attempts.append((primary_port, use_tls, "primary"))
         if use_ssl_fallback and not (primary_port == 465 and not use_tls):
             attempts.append((465, False, "fallback_ssl_465"))
-    else:
-        errors = []
-        if resend_error:
-            errors.append(resend_error)
+    elif not _is_gmail_api_configured() and not resend_api_key:
         errors.append("SMTP credentials are not configured.")
         current_app.logger.error("All email send attempts failed.")
         return False, verification_url, " | ".join(errors)
 
-    errors = []
-    if resend_error:
-        errors.append(resend_error)
     for port, tls_enabled, label in attempts:
         try:
             if tls_enabled:
@@ -139,4 +221,6 @@ def send_verification_email(recipient_email, token, base_url_override=None):
             )
 
     current_app.logger.error("All email send attempts failed.")
+    if not attempts and errors:
+        return False, verification_url, " | ".join(errors)
     return False, verification_url, " | ".join(errors)

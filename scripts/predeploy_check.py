@@ -9,11 +9,25 @@ from dotenv import load_dotenv
 REQUIRED_ENV_VARS = [
     "DATABASE_URL",
     "APP_BASE_URL",
+    "SECRET_KEY",
+    "ADMIN_API_KEY",
+]
+
+SMTP_ENV_VARS = [
     "MAIL_USERNAME",
     "MAIL_PASSWORD",
     "MAIL_SENDER",
-    "SECRET_KEY",
-    "ADMIN_API_KEY",
+]
+
+GMAIL_API_ENV_VARS = [
+    "GMAIL_API_CLIENT_ID",
+    "GMAIL_API_CLIENT_SECRET",
+    "GMAIL_API_REFRESH_TOKEN",
+]
+
+RESEND_ENV_VARS = [
+    "RESEND_API_KEY",
+    "RESEND_FROM_EMAIL",
 ]
 
 
@@ -66,6 +80,25 @@ def main():
         )
     else:
         ok("APP_BASE_URL uses HTTPS.")
+
+    email_provider_ready = False
+    if all(os.getenv(key, "").strip() for key in GMAIL_API_ENV_VARS):
+        ok("Gmail API email delivery is configured.")
+        email_provider_ready = True
+    elif all(os.getenv(key, "").strip() for key in SMTP_ENV_VARS):
+        ok("SMTP email delivery is configured.")
+        email_provider_ready = True
+    elif all(os.getenv(key, "").strip() for key in RESEND_ENV_VARS):
+        ok("Resend email delivery is configured.")
+        email_provider_ready = True
+
+    if not email_provider_ready:
+        print("[FAIL] No complete email provider configuration found.")
+        print("Provide one of the following:")
+        print(" - Gmail API: " + ", ".join(GMAIL_API_ENV_VARS))
+        print(" - SMTP: " + ", ".join(SMTP_ENV_VARS))
+        print(" - Resend: " + ", ".join(RESEND_ENV_VARS))
+        return 1
 
     ok("Pre-deploy checks completed.")
     return 0

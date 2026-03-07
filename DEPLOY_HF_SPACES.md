@@ -6,7 +6,7 @@ This guide deploys the app to a public URL that works even when your laptop is o
 
 1. GitHub repo is up to date.
 2. Neon PostgreSQL database is created.
-3. Gmail App Password is ready.
+3. Gmail or Google account available for Gmail API sender.
 
 ## 2. Create Space
 
@@ -33,9 +33,11 @@ Open **Settings -> Repository secrets** and add:
 
 - `DATABASE_URL`
 - `APP_BASE_URL`
-- `MAIL_USERNAME`
-- `MAIL_PASSWORD`
 - `MAIL_SENDER`
+- `GMAIL_API_CLIENT_ID`
+- `GMAIL_API_CLIENT_SECRET`
+- `GMAIL_API_REFRESH_TOKEN`
+- `GMAIL_API_SENDER`
 - `RESEND_API_KEY`
 - `RESEND_FROM_EMAIL` (`onboarding@resend.dev` for testing)
 - `SECRET_KEY`
@@ -66,5 +68,8 @@ Set `APP_BASE_URL` to your Space URL:
 ## 6. Notes
 
 1. Free Spaces may sleep after inactivity and wake on next request.
-2. Keep all real secrets only in Space secrets and local private `.env` files.
-3. Do not commit `.env` or `.env.production`.
+2. Hugging Face often cannot reach Gmail SMTP reliably, so Gmail API is the recommended hosted email path.
+3. Generate the refresh token locally with:
+   `python scripts\gmail_oauth_setup.py --env-file .env.production`
+4. Keep all real secrets only in Space secrets and local private `.env` files.
+5. Do not commit `.env` or `.env.production`.
